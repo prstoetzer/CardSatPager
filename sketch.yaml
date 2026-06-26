@@ -1,0 +1,21 @@
+# arduino-cli build profile for CardSatPager (LilyGo T-LoRa Pager).
+# Pins the ESP32 core + FQBN so a fresh clone reproduces the toolchain on any OS.
+#
+#   arduino-cli compile --profile pager
+#   arduino-cli upload  --profile pager -p <your-port>
+#
+# NOTE: LilyGoLib + LilyGoLib-ThirdParty are not all in the arduino-cli library
+# index. Install them into this project's sketchbook/libraries (see
+# docs/BUILD_ENVIRONMENTS.md) or vendor them under ./libraries and add
+# --libraries ./libraries. The profile still pins the CORE version, which is the
+# collision that matters most when also building CardSat for the Cardputer ADV.
+
+profiles:
+  pager:
+    notes: LilyGo T-LoRa Pager, SX1262 revision
+    fqbn: esp32:esp32:tlora_pager:Revision=Radio_SX1262,CDCOnBoot=cdc,PartitionScheme=app3M_fat9M_16MB
+    platforms:
+      - platform: esp32:esp32 (3.3.0-alpha1)
+        platform_index_url: https://espressif.github.io/arduino-esp32/package_esp32_dev_index.json
+
+default_profile: pager

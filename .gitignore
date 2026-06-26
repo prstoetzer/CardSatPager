@@ -1,0 +1,59 @@
+# ============================================================
+#  CardSatPager .gitignore
+# ============================================================
+
+# ---- macOS system files ----
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.DocumentRevisions-V100
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+Icon?
+
+# ---- Windows system files ----
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+
+# ---- Linux system files ----
+*~
+.directory
+.Trash-*
+.nfs*
+
+# ---- Arduino / build artifacts ----
+build/
+*.bin
+*.elf
+*.hex
+*.map
+*.d
+*.o
+*.a
+.theia/
+.vscode/
+*.tmp
+
+# ---- arduino-cli local data / caches (machine-specific, large) ----
+.arduino15*/
+.arduino-*/
+.cache/
+
+# ---- Editor / IDE noise ----
+.idea/
+*.swp
+*.swo
+*.sublime-workspace

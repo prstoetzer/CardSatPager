@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1180" viewBox="0 0 900 1180" font-family="'DejaVu Sans Mono','Menlo',monospace">
+  <rect width="900" height="1180" fill="#0d1117"/>
+
+  <!-- ============ SCREEN 1: CHAT VIEW ============ -->
+  <text x="40" y="36" fill="#8b949e" font-size="17" font-family="sans-serif">1 · Chat view (idle, message received)</text>
+
+  <!-- device bezel -->
+  <rect x="40" y="52" width="820" height="379" rx="18" fill="#1c2128" stroke="#30363d" stroke-width="2"/>
+  <!-- screen 480x222 -> scaled x1.625 = 780x361 -->
+  <g transform="translate(60,72)">
+    <rect width="780" height="339" rx="4" fill="#000000"/>
+
+    <!-- status bar (24px -> 39) -->
+    <rect width="780" height="39" fill="#161b22"/>
+    <text x="12" y="25" fill="#e6edf3" font-size="17" font-weight="bold">N8HM</text>
+    <text x="250" y="25" fill="#7d8590" font-size="15">906.875 SF12 BW125</text>
+    <text x="620" y="25" fill="#3fb950" font-size="15">87%</text>
+    <text x="678" y="25" fill="#d29922" font-size="15">&#128276;1</text>
+    <rect x="724" y="8" width="44" height="24" rx="5" fill="#21262d" stroke="#30363d"/>
+    <text x="738" y="25" fill="#8b949e" font-size="16">&#9881;</text>
+
+    <!-- chat bubbles -->
+    <!-- incoming -->
+    <g transform="translate(12,52)">
+      <rect width="430" height="58" rx="7" fill="#21323f"/>
+      <text x="12" y="22" fill="#80c0ff" font-size="14" font-weight="bold">KK4XYZ  <tspan fill="#6e7681">[-72/9]</tspan></text>
+      <text x="12" y="44" fill="#e6edf3" font-size="15">Morning! Anyone on the AO-91 pass?</text>
+    </g>
+    <!-- outgoing -->
+    <g transform="translate(338,120)">
+      <rect width="430" height="58" rx="7" fill="#1a4023"/>
+      <text x="12" y="22" fill="#e6edf3" font-size="15">Yep, copying you 5x9 here</text>
+      <text x="338" y="44" fill="#a0ffa0" font-size="14" text-anchor="end">N8HM</text>
+    </g>
+    <!-- incoming (newest, just arrived) -->
+    <g transform="translate(12,188)">
+      <rect width="500" height="58" rx="7" fill="#21323f" stroke="#d29922" stroke-width="1.5"/>
+      <text x="12" y="22" fill="#80c0ff" font-size="14" font-weight="bold">KK4XYZ  <tspan fill="#6e7681">[-74/8]</tspan></text>
+      <text x="12" y="44" fill="#e6edf3" font-size="15">Hello from space &#128640;</text>
+    </g>
+
+    <!-- compose bar (36px -> 58) pinned bottom -->
+    <g transform="translate(0,281)">
+      <rect width="780" height="58" fill="#161b22"/>
+      <rect x="10" y="11" width="690" height="36" rx="6" fill="#0d1117" stroke="#30363d"/>
+      <text x="24" y="34" fill="#484f58" font-size="15" font-style="italic">Message...</text>
+      <rect x="712" y="11" width="56" height="36" rx="6" fill="#238636"/>
+      <text x="734" y="35" fill="#ffffff" font-size="18">&#8593;</text>
+    </g>
+  </g>
+
+  <!-- ============ SCREEN 2: COMPOSE ACTIVE ============ -->
+  <text x="40" y="500" fill="#8b949e" font-size="17" font-family="sans-serif">2 · Composing (keyboard focused, encoder clicked to edit)</text>
+
+  <rect x="40" y="516" width="820" height="379" rx="18" fill="#1c2128" stroke="#30363d" stroke-width="2"/>
+  <g transform="translate(60,536)">
+    <rect width="780" height="339" rx="4" fill="#000000"/>
+
+    <rect width="780" height="39" fill="#161b22"/>
+    <text x="12" y="25" fill="#e6edf3" font-size="17" font-weight="bold">N8HM</text>
+    <text x="250" y="25" fill="#7d8590" font-size="15">906.875 SF12 BW125</text>
+    <text x="620" y="25" fill="#3fb950" font-size="15">87%</text>
+    <rect x="724" y="8" width="44" height="24" rx="5" fill="#21262d" stroke="#30363d"/>
+    <text x="738" y="25" fill="#8b949e" font-size="16">&#9881;</text>
+
+    <g transform="translate(338,52)">
+      <rect width="430" height="58" rx="7" fill="#1a4023"/>
+      <text x="12" y="22" fill="#e6edf3" font-size="15">Yep, copying you 5x9 here</text>
+      <text x="338" y="44" fill="#a0ffa0" font-size="14" text-anchor="end">N8HM</text>
+    </g>
+    <g transform="translate(12,120)">
+      <rect width="500" height="58" rx="7" fill="#21323f"/>
+      <text x="12" y="22" fill="#80c0ff" font-size="14" font-weight="bold">KK4XYZ  <tspan fill="#6e7681">[-74/8]</tspan></text>
+      <text x="12" y="44" fill="#e6edf3" font-size="15">Hello from space &#128640;</text>
+    </g>
+
+    <!-- compose active: text + cursor + char count -->
+    <g transform="translate(0,281)">
+      <rect width="780" height="58" fill="#161b22"/>
+      <rect x="10" y="11" width="690" height="36" rx="6" fill="#0d1117" stroke="#1f6feb" stroke-width="2"/>
+      <text x="24" y="34" fill="#e6edf3" font-size="15">QSL, switching to the bird now<tspan fill="#1f6feb" font-weight="bold">|</tspan></text>
+      <text x="690" y="9" fill="#6e7681" font-size="11" text-anchor="end">30/48</text>
+      <rect x="712" y="11" width="56" height="36" rx="6" fill="#238636"/>
+      <text x="734" y="35" fill="#ffffff" font-size="18">&#8593;</text>
+    </g>
+  </g>
+
+  <!-- ============ SCREEN 3: SETTINGS ============ -->
+  <text x="40" y="964" fill="#8b949e" font-size="17" font-family="sans-serif">3 · Settings (scrollable — all params persist to NVS)</text>
+
+  <rect x="40" y="980" width="820" height="180" rx="18" fill="#1c2128" stroke="#30363d" stroke-width="2"/>
+  <g transform="translate(60,1000)">
+    <rect width="780" height="140" rx="4" fill="#000000"/>
+    <text x="14" y="26" fill="#e6edf3" font-size="16" font-weight="bold">Settings</text>
+
+    <!-- rows (two columns to fit the strip) -->
+    <g font-size="13.5">
+      <text x="14"  y="52" fill="#8b949e">Callsign</text>
+      <rect x="120" y="40" width="120" height="20" rx="3" fill="#0d1117" stroke="#30363d"/>
+      <text x="128" y="55" fill="#e6edf3">N8HM</text>
+
+      <text x="14"  y="80" fill="#8b949e">Region</text>
+      <rect x="120" y="68" width="120" height="20" rx="3" fill="#21262d" stroke="#30363d"/>
+      <text x="128" y="83" fill="#e6edf3">US 906.875 &#9662;</text>
+
+      <text x="14"  y="108" fill="#8b949e">Freq (kHz)</text>
+      <rect x="120" y="96" width="120" height="20" rx="3" fill="#0d1117" stroke="#30363d"/>
+      <text x="128" y="111" fill="#e6edf3">906875</text>
+
+      <text x="270" y="52" fill="#8b949e">SF</text>
+      <rect x="320" y="40" width="60" height="20" rx="3" fill="#21262d" stroke="#30363d"/>
+      <text x="328" y="55" fill="#e6edf3">12 &#9662;</text>
+      <text x="410" y="52" fill="#8b949e">BW</text>
+      <rect x="460" y="40" width="74" height="20" rx="3" fill="#21262d" stroke="#30363d"/>
+      <text x="468" y="55" fill="#e6edf3">125 &#9662;</text>
+
+      <text x="270" y="80" fill="#8b949e">CR 4/</text>
+      <rect x="320" y="68" width="60" height="20" rx="3" fill="#21262d" stroke="#30363d"/>
+      <text x="328" y="83" fill="#e6edf3">5 &#9662;</text>
+      <text x="410" y="80" fill="#8b949e">Sync</text>
+      <rect x="460" y="68" width="74" height="20" rx="3" fill="#0d1117" stroke="#30363d"/>
+      <text x="468" y="83" fill="#e6edf3">18</text>
+
+      <text x="270" y="108" fill="#8b949e">TX dBm</text>
+      <rect x="330" y="100" width="100" height="6" rx="3" fill="#30363d"/>
+      <rect x="330" y="100" width="91" height="6" rx="3" fill="#1f6feb"/>
+      <circle cx="421" cy="103" r="6" fill="#1f6feb"/>
+      <text x="440" y="108" fill="#e6edf3">20</text>
+    </g>
+
+    <!-- right column toggles + buttons -->
+    <g font-size="13.5">
+      <text x="566" y="52" fill="#8b949e">Beep RX</text>
+      <rect x="660" y="42" width="34" height="18" rx="9" fill="#238636"/>
+      <circle cx="686" cy="51" r="7" fill="#fff"/>
+
+      <text x="566" y="80" fill="#8b949e">Light sleep</text>
+      <rect x="660" y="70" width="34" height="18" rx="9" fill="#238636"/>
+      <circle cx="686" cy="79" r="7" fill="#fff"/>
+
+      <rect x="566" y="98" width="64" height="26" rx="5" fill="#21262d" stroke="#30363d"/>
+      <text x="578" y="115" fill="#8b949e">Back</text>
+      <rect x="640" y="98" width="120" height="26" rx="5" fill="#238636"/>
+      <text x="652" y="115" fill="#fff" font-size="12.5">Apply &amp; Save</text>
+    </g>
+  </g>
+
+  <text x="40" y="1175" fill="#484f58" font-size="12" font-family="sans-serif">Rendered at the Pager's 480&#215;222 aspect. Colors approximate the LVGL dark theme; the physical IPS panel is brighter and sharper.</text>
+</svg>
