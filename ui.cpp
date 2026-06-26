@@ -18,12 +18,32 @@
 //  textarea works once that group is attached.
 // =============================================================================
 #include "ui.h"
+#include <LV_Helper.h>   // lv_set_default_group()
 #include <stdio.h>
 
 static Config*   s_cfg   = nullptr;
 static MsgStore* s_store = nullptr;
 static UiSendCb               s_onSend = nullptr;
 static UiSettingsAppliedCb    s_onApplied = nullptr;
+
+// --- Input groups (one per screen). The keyboard + encoder indevs are pointed
+//     at the active screen's group via lv_set_default_group() on screen load, so
+//     the encoder cycles focus among that screen's widgets and keys go to the
+//     focused one. Without this, beginLvglHelper's indevs drive an empty default
+//     group and nothing is focusable. ---
+static lv_group_t* grp_chat     = nullptr;
+static lv_group_t* grp_settings = nullptr;
+
+// Add a focusable widget to a group (helper to keep creation sites tidy).
+static inline void groupAdd(lv_group_t* g, lv_obj_t* obj) { lv_group_add_obj(g, obj); }
+
+// Load a screen AND point the keyboard/encoder indevs at that screen's group,
+// so focus + key input follow the visible screen.
+static void loadScreen(lv_obj_t* scr, lv_group_t* grp)
+{
+    lv_set_default_group(grp);     // rebinds all indevs to grp (LV_Helper API)
+    lv_screen_load(scr);
+}
 
 // --- Screen / widget handles ---
 static lv_obj_t* scr_chat;
@@ -103,6 +123,12 @@ static void onSendClicked(lv_event_t* e)
     if (txt && txt[0] && s_onSend) {
         s_onSend(txt);
         lv_textarea_set_text(ta_compose, "");
+    }
+    // If this came from the keyboard Enter (LV_EVENT_READY), leave edit mode so
+    // the encoder can move focus again rather than staying trapped in the field.
+    if (lv_event_get_code(e) == LV_EVENT_READY) {
+        lv_group_t* g = (lv_group_t*)lv_obj_get_group(ta_compose);
+        if (g) lv_group_set_editing(g, false);
     }
 }
 
@@ -185,16 +211,31 @@ static void onSettingsApply(lv_event_t* e)
     configSave(c);                 // persist to NVS
     if (s_onApplied) s_onApplied();   // app re-applies radio + brightness
 
-    lv_screen_load(scr_chat);      // back to chat
+    loadScreen(scr_chat, grp_chat);   // back to chat
 }
 
 static void onOpenSettings(lv_event_t* e)
 {
     fillSettingsFromCfg();
-    lv_screen_load(scr_settings);
+    loadScreen(scr_settings, grp_settings);
 }
 
-static void onSettingsBack(lv_event_t* e) { lv_screen_load(scr_chat); }
+static void onSettingsBack(lv_event_t* e) { loadScreen(scr_chat, grp_chat); }
+
+// When Enter is pressed in a one-line textarea, LVGL fires LV_EVENT_READY. On an
+// encoder/keypad UI a focused textarea otherwise traps input — you can't get
+// back out to the Back/Apply buttons. This handler takes the field's group out
+// of edit mode and advances focus to the next widget, so Enter means "done with
+// this field, move on".
+static void onFieldDone(lv_event_t* e)
+{
+    lv_obj_t* ta = (lv_obj_t*)lv_event_get_target(e);
+    lv_group_t* g = (lv_group_t*)lv_obj_get_group(ta);
+    if (g) {
+        lv_group_set_editing(g, false);   // leave text-edit mode
+        lv_group_focus_next(g);           // move to the next focusable widget
+    }
+}
 
 // Helper: labelled row in the settings flow layout.
 static lv_obj_t* settingsRow(lv_obj_t* parent, const char* label)
@@ -231,6 +272,7 @@ static void buildSettingsScreen()
     lv_textarea_set_one_line(set_call, true);
     lv_textarea_set_max_length(set_call, cardsat::FROM_LEN);
     lv_obj_set_width(set_call, 140);
+    lv_obj_add_event_cb(set_call, onFieldDone, LV_EVENT_READY, nullptr);
 
     row = settingsRow(col, "Region");
     set_region = lv_dropdown_create(row);
@@ -243,6 +285,7 @@ static void buildSettingsScreen()
     lv_textarea_set_accepted_chars(set_freq, "0123456789");
     lv_textarea_set_max_length(set_freq, 7);
     lv_obj_set_width(set_freq, 110);
+    lv_obj_add_event_cb(set_freq, onFieldDone, LV_EVENT_READY, nullptr);
 
     row = settingsRow(col, "Spreading factor");
     set_sf = lv_dropdown_create(row);
@@ -262,6 +305,7 @@ static void buildSettingsScreen()
     lv_textarea_set_accepted_chars(set_sync, "0123456789");
     lv_textarea_set_max_length(set_sync, 3);
     lv_obj_set_width(set_sync, 70);
+    lv_obj_add_event_cb(set_sync, onFieldDone, LV_EVENT_READY, nullptr);
 
     row = settingsRow(col, "TX power (dBm)");
     set_pwr = lv_slider_create(row);
@@ -270,7 +314,7 @@ static void buildSettingsScreen()
 
     row = settingsRow(col, "Brightness");
     set_bri = lv_slider_create(row);
-    lv_slider_set_range(set_bri, 0, 255);
+    lv_slider_set_range(set_bri, 1, 16);
     lv_obj_set_width(set_bri, 150);
 
     row = settingsRow(col, "Dim after (s, 0=off)");
@@ -290,6 +334,14 @@ static void buildSettingsScreen()
     row = settingsRow(col, "Light sleep when idle");
     set_lsl = lv_switch_create(row);
 
+    // Register every focusable settings widget so the encoder can navigate them
+    // and the keyboard types into the focused textarea.
+    lv_obj_t* focusables[] = {
+        set_call, set_region, set_freq, set_sf, set_bw, set_cr, set_sync,
+        set_pwr, set_bri, set_dim, set_sleep, set_snd, set_vib, set_lsl
+    };
+    for (lv_obj_t* w : focusables) groupAdd(grp_settings, w);
+
     // buttons
     lv_obj_t* btns = lv_obj_create(col);
     lv_obj_set_width(btns, lv_pct(100));
@@ -301,10 +353,12 @@ static void buildSettingsScreen()
     lv_obj_t* back = lv_button_create(btns);
     lv_label_set_text(lv_label_create(back), "Back");
     lv_obj_add_event_cb(back, onSettingsBack, LV_EVENT_CLICKED, nullptr);
+    groupAdd(grp_settings, back);
 
     lv_obj_t* apply = lv_button_create(btns);
     lv_label_set_text(lv_label_create(apply), "Apply & Save");
     lv_obj_add_event_cb(apply, onSettingsApply, LV_EVENT_CLICKED, nullptr);
+    groupAdd(grp_settings, apply);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,6 +389,7 @@ static void buildChatScreen()
     lv_obj_t* gear = lv_button_create(bar);
     lv_label_set_text(lv_label_create(gear), LV_SYMBOL_SETTINGS);
     lv_obj_add_event_cb(gear, onOpenSettings, LV_EVENT_CLICKED, nullptr);
+    groupAdd(grp_chat, gear);
 
     // chat list (grows)
     list_chat = lv_obj_create(scr_chat);
@@ -343,6 +398,13 @@ static void buildChatScreen()
     lv_obj_set_flex_flow(list_chat, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(list_chat, 4, 0);
     lv_obj_set_style_bg_opa(list_chat, LV_OPA_TRANSP, 0);
+    // Make the message history reachable by the encoder so you can scroll back
+    // through past messages: it must be focusable (default group navigation) and
+    // vertically scrollable. Once focused, rotating the encoder scrolls it.
+    lv_obj_add_flag(list_chat, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(list_chat, LV_OBJ_FLAG_SCROLL_WITH_ARROW);  // arrow/encoder scrolls
+    lv_obj_set_scroll_dir(list_chat, LV_DIR_VER);
+    groupAdd(grp_chat, list_chat);
 
     // compose bar
     lv_obj_t* compose = lv_obj_create(scr_chat);
@@ -358,10 +420,13 @@ static void buildChatScreen()
     lv_textarea_set_max_length(ta_compose, cardsat::TEXT_MAX);  // clamp 48 (§4.2)
     lv_textarea_set_placeholder_text(ta_compose, "Message...");
     lv_obj_set_flex_grow(ta_compose, 1);
+    lv_obj_add_event_cb(ta_compose, onSendClicked, LV_EVENT_READY, nullptr);  // Enter = send
+    groupAdd(grp_chat, ta_compose);
 
     lv_obj_t* send = lv_button_create(compose);
     lv_label_set_text(lv_label_create(send), LV_SYMBOL_UP);
     lv_obj_add_event_cb(send, onSendClicked, LV_EVENT_CLICKED, nullptr);
+    groupAdd(grp_chat, send);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,10 +435,18 @@ static void buildChatScreen()
 void uiInit(Config* cfg, MsgStore* store)
 {
     s_cfg = cfg; s_store = store;
+
+    // Create the per-screen input groups BEFORE building screens, since each
+    // widget registers into its screen's group as it's created.
+    grp_chat     = lv_group_create();
+    grp_settings = lv_group_create();
+
     buildChatScreen();
     buildSettingsScreen();
     lv_label_set_text(lbl_call, cfg->callsign);
-    lv_screen_load(scr_chat);
+
+    // Load the chat screen and bind the keyboard/encoder to its group.
+    loadScreen(scr_chat, grp_chat);
 }
 
 void uiSetCallbacks(UiSendCb onSend, UiSettingsAppliedCb onApplied)
@@ -384,7 +457,11 @@ void uiSetCallbacks(UiSendCb onSend, UiSettingsAppliedCb onApplied)
 void uiSetBattery(int percent, bool charging)
 {
     char b[16];
-    snprintf(b, sizeof(b), "%s%d%%", charging ? LV_SYMBOL_CHARGE : "", percent);
+    if (percent < 0) {
+        snprintf(b, sizeof(b), "--%%");
+    } else {
+        snprintf(b, sizeof(b), "%s%d%%", charging ? LV_SYMBOL_CHARGE : "", percent);
+    }
     lv_label_set_text(lbl_batt, b);
 }
 

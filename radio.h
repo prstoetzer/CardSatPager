@@ -1,5 +1,5 @@
 // =============================================================================
-//  radio.h  -  Thin wrapper around the LilyGoLib SX1262 handle (instance.radio).
+//  radio.h  -  Thin wrapper around the LilyGoLib global SX1262 `radio` object.
 //
 //  Centralises every RadioLib call so the rest of the app never touches the
 //  radio directly. Applies a Config (protocol §2/§3), transmits CardSat frames,
@@ -7,7 +7,8 @@
 //  (preamble 8, CRC on, explicit header) so we don't depend on library defaults.
 //
 //  Depends on LilyGoLib being initialised (instance.begin()) BEFORE radioApply()
-//  is called — instance.radio is the RadioLib SX1262 object for this board.
+//  is called. The radio is the global `extern SX1262 radio;` declared by
+//  LilyGo_LoRa_Pager.h (pulled in via LilyGoLib.h) for the SX1262 board revision.
 // =============================================================================
 #ifndef CARDSAT_RADIO_H
 #define CARDSAT_RADIO_H

@@ -82,21 +82,31 @@ Per LilyGo's keyboard convention: **Space + key** for numbers/symbols, **CAP +
 key** for capitals, **left orange button + B** toggles the backlight. Click the
 encoder to focus a text field, type, Enter to confirm.
 
-## Two glue points to verify against your LilyGoLib version
+## LilyGoLib API — verified, plus one item to confirm
 
-Everything CardSat-specific is concrete and version-independent. A few calls touch
-LilyGoLib's HAL, whose names drift between revisions. If compilation fails, these
-are the only places to reconcile — the protocol logic is untouched:
+These were reconciled against the installed LilyGoLib headers (`LilyGo_LoRa_Pager.h`,
+`LV_Helper.h`):
 
-1. **LVGL bridge** — `bridgeLvgl()` calls `beginLvglHelper(instance)`. Match it to
-   your LilyGoLib's LVGL example init call.
-2. **PMU / sleep + notifications** — `instance.getBatteryPercent()`,
-   `instance.isCharging()`, `instance.sleep()`, and the buzzer/haptic calls in
-   `notify.h`. Substitute your revision's equivalents, or leave the related
-   toggles off.
+- **Radio** is the global `extern SX1262 radio;` — the code calls `radio.setFrequency(...)`
+  etc. directly (not `instance.radio`).
+- **LVGL bridge** is `beginLvglHelper(instance)`, which **calls `lv_init()` itself**,
+  so the sketch does not call `lv_init()` separately.
+- **Haptic** notification uses `instance.vibrator()`.
+- **Deep sleep** uses `instance.sleep(WAKEUP_SRC_BOOT_BUTTON)`.
 
-The light-sleep nap uses plain ESP-IDF `esp_light_sleep_start()` and is
-version-independent.
+**One thing to confirm — battery readout.** The PMU battery-gauge accessor name
+wasn't in the headers I checked (it's on the TI PMU / XPowersLib path for this
+board), so the battery indicator currently shows `--%`. To enable it, grep your
+library for the accessor and wire it up:
+
+```bash
+cd ~/Documents/Arduino/libraries/LilyGoLib/src
+grep -rn -iE 'getBatt|battery|percent|charging|isVbus|chargeState' *.h
+```
+
+Then in `CardSatPager.ino`, fill in the two calls under `#ifdef CARDSAT_HAVE_BATTERY`
+with the verified names and add `#define CARDSAT_HAVE_BATTERY` at the top. Paste the
+grep output and I'll wire it for you.
 
 ## Pure-RadioLib fallback
 

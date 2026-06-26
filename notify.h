@@ -1,10 +1,20 @@
 // =============================================================================
-//  notify.h  -  Incoming-message notifications: sound + vibration.
+//  notify.h  -  Incoming-message notifications: haptic + screen wake.
 //
-//  These route through LilyGoLib helpers. The exact method names for the
-//  buzzer/haptic on the Pager vary by LilyGoLib revision; the two calls below
-//  are isolated here so they're the only spot to reconcile. If your version
-//  lacks one, leave the corresponding config toggle off and the call is skipped.
+//  Verified against LilyGo_LoRa_Pager.h:
+//    void vibrator();                 // single buzz of the haptic motor
+//    void setHapticEffects(uint8_t);  // select DRV2605-style effect (optional)
+//
+//  The Pager has NO simple piezo buzzer/tone API on this class — audio runs
+//  through the ES8311 codec, which is far heavier than a notification warrants.
+//  So the "alert" here is the haptic motor (the natural pager behaviour). The
+//  config's soundOnRx and vibrateOnRx are both mapped onto the vibrator: enabling
+//  either gives you a buzz. The screen-wake always happens so a new message is
+//  visible.
+//
+//  If you later want an audible chirp, drive the ES8311 with a short tone sample
+//  in app.cpp; it's intentionally left out of the notification path to keep RX
+//  servicing light.
 // =============================================================================
 #ifndef CARDSAT_NOTIFY_H
 #define CARDSAT_NOTIFY_H
@@ -21,18 +31,10 @@ inline void notifyIncoming(const Config& cfg)
     // Always wake the display so a new message is visible.
     uiWake();
 
-    if (cfg.soundOnRx) {
-        // LilyGoLib exposes a short tone helper on boards with a buzzer/speaker.
-        // If your revision uses a different call (e.g. instance.playTone / a
-        // ToneController), substitute it here.
-        #if defined(LILYGO_HAS_BUZZER) || 1
-        instance.setWaveform(0, 1);   // placeholder: see README "Notification API"
-        #endif
-    }
-
-    if (cfg.vibrateOnRx) {
-        // Haptic motor, if fitted. Same caveat as above.
-        // instance.vibrator(...) / instance.setHapticEffect(...) per revision.
+    // Haptic alert for either "sound" or "vibrate" preference. `instance` is the
+    // global LilyGoLoRaPager object from LilyGoLib.h.
+    if (cfg.soundOnRx || cfg.vibrateOnRx) {
+        instance.vibrator();   // one short buzz
     }
 }
 

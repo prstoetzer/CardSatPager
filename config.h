@@ -30,7 +30,7 @@ struct Config {
     uint8_t  region    = REGION_US;
 
     // --- UI / power ---
-    uint8_t  brightness      = 180;   // 0..255 backlight
+    uint8_t  brightness      = 12;    // 0..16 backlight (Pager scale; 16 = max)
     uint16_t dimTimeoutS     = 30;    // idle seconds -> dim screen (0 = never)
     uint16_t sleepTimeoutS   = 0;     // idle seconds -> deep sleep (0 = never)
     bool     soundOnRx       = true;  // buzzer/beep on incoming message
@@ -58,6 +58,11 @@ inline void configClamp(Config& c)
     if (c.freqKHz < 150000) c.freqKHz = 150000;
     if (c.freqKHz > 960000) c.freqKHz = 960000;
     if (c.region > REGION_JP && c.region != REGION_CUSTOM) c.region = REGION_CUSTOM;
+    // Brightness is the Pager's 0..16 scale (DEVICE_MAX_BRIGHTNESS_LEVEL=16).
+    // Clamp to 1..16 so a stale 0..255 NVS value or a zero can't black out the
+    // screen. Minimum 1 keeps the panel visible.
+    if (c.brightness < 1)  c.brightness = 1;
+    if (c.brightness > 16) c.brightness = 16;
 }
 
 // Apply a region preset's freq + bw (protocol §3). Leaves SF/power/etc alone.

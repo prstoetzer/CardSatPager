@@ -24,6 +24,7 @@
 // =============================================================================
 
 #include <LilyGoLib.h>
+#include <LV_Helper.h>     // beginLvglHelper(LilyGo_Display&) — LVGL bring-up
 #include <lvgl.h>
 
 #include "cardsat_proto.h"
@@ -52,7 +53,14 @@ void uiWake()   // called by notify.h on RX, and by us on any input
     }
 }
 
-static void applyBrightness() { instance.setBrightness(cfg.brightness); }
+static void applyBrightness()
+{
+    // The Pager backlight starts at 0 after begin(); incrementalBrightness ramps
+    // from the current level up to the target (0..16 scale) and drives the real
+    // AW9364 LED driver. Using the ramp (rather than a bare setBrightness) is the
+    // library's own boot pattern and is the reliable way to light the panel.
+    instance.incrementalBrightness(cfg.brightness);
+}
 
 static void radioSummary(char* out, size_t n)
 {
@@ -90,16 +98,95 @@ static void onSettingsApplied()
 // ---------------------------------------------------------------------------
 //  LVGL <-> LilyGoLib bridge
 //
-//  GLUE POINT 1 (see README): LilyGoLib provides an LVGL helper that registers
-//  the ST7796 as an lv_display and the keyboard+encoder as lv_indev objects,
-//  grouped so the focused widget receives typed characters. The helper name
-//  differs slightly by LilyGoLib revision — commonly `beginLvglHelper()`. If
-//  yours differs, call the matching helper here. After it runs, lv_* calls in
-//  ui.cpp drive the screen and the keyboard types into the focused textarea.
+//  Verified against LV_Helper.h:
+//    void beginLvglHelper(LilyGo_Display &display, bool debug = false);
+//  `instance` (the global LilyGoLoRaPager) IS a LilyGo_Display, so it binds to
+//  the reference parameter directly. The helper registers the ST7796 as an
+//  lv_display and the keyboard+encoder+touch as grouped lv_indev objects, so the
+//  focused widget receives typed characters and encoder rotation.
+//
+//  IMPORTANT: beginLvglHelper() calls lv_init() ITSELF — do NOT call lv_init()
+//  separately, or LVGL is double-initialised.
+// ---------------------------------------------------------------------------
+//  Keyboard symbol-layer fix.
+//  LilyGoLib's stock Pager keyboard config ships with has_symbol_key = false,
+//  which half-disables the orange symbol key: pressing it toggles the symbol
+//  layer but returns 0 ("not handled"), so the press falls through to a junk
+//  lookup and the layer toggle never takes effect — you can't reach digits or
+//  symbols. Re-initialising the keyboard with has_symbol_key = true makes the
+//  symbol key behave: press orange, then the top row types 1234567890, the next
+//  row * / + - = : ' " @, etc. Keymaps are copied verbatim from LilyGoLib so the
+//  per-key mapping is identical. KB_INT / KB_BACKLIGHT come from the board
+//  variant (defined by ARDUINO_T_LORA_PAGER).
+// ---------------------------------------------------------------------------
+static const char kbKeymap[4][10] = {
+    {'q','w','e','r','t','y','u','i','o','p'},
+    {'a','s','d','f','g','h','j','k','l','\n'},
+    {'\0','z','x','c','v','b','n','m','\0','\0'},
+    {' ','\0','\0','\0','\0','\0','\0','\0','\0','\0'}
+};
+static const char kbSymbolMap[4][10] = {
+    {'1','2','3','4','5','6','7','8','9','0'},
+    {'*','/','+','-','=',':','\'','"','@','\0'},
+    {'\0','_','$',';','?','!',',','.','\0','\0'},
+    {' ','\0','\0','\0','\0','\0','\0','\0','\0','\0'}
+};
+
+// ---------------------------------------------------------------------------
+//  Keyboard keycode diagnostic.
+//  Set to 1, reflash, open Serial Monitor, and press keys: each prints its raw
+//  TCA8418 keycode. Press the orange symbol key and the number-row keys to learn
+//  their real codes. With this enabled, NORMAL typing is suppressed (the raw
+//  callback short-circuits LilyGoLib's decode), so set it back to 0 when done.
+// ---------------------------------------------------------------------------
+#define CARDSAT_KB_KEYCODE_DEBUG 0
+
+#if CARDSAT_KB_KEYCODE_DEBUG
+static void kbRawProbe(bool pressed, uint8_t raw)
+{
+    Serial.printf("[kbraw] keycode=0x%02X (%u)  %s\n",
+                  raw, raw, pressed ? "DOWN" : "up");
+}
+#endif
+
+static void fixKeyboardSymbolKey()
+{
+    // IMPORTANT: kb.begin() stores a POINTER to this config (it does not copy it),
+    // so the struct must outlive the call — hence 'static'. A local here would
+    // dangle the moment this function returns and corrupt all key decoding.
+    static LilyGoKeyboardConfigure_t kc = {};
+    kc.kb_rows            = 4;
+    kc.kb_cols            = 10;
+    kc.current_keymap     = &kbKeymap[0][0];
+    kc.current_symbol_map = &kbSymbolMap[0][0];
+    // The orange symbol key reports raw keycode 0x15; update() decrements by 1
+    // before matching, so its effective value is 0x14. LilyGoLib's stock config
+    // wrongly assigned 0x14 to ALT and 0x1E to symbol, so the orange key acted as
+    // ALT and symbol mode was unreachable. Assign the orange key (0x14) as the
+    // symbol key, and park ALT on an unused code so it can't collide.
+    kc.symbol_key_value   = 0x14;   // orange triangle key (raw 0x15, -1 => 0x14)
+    kc.alt_key_value      = 0xFE;   // unused; we don't use ALT
+    kc.caps_key_value     = 0x1C;
+    kc.caps_b_key_value   = 0xFF;
+    kc.char_b_value       = 0xFD;   // unused (ALT+B brightness shortcut disabled)
+    kc.backspace_value    = 0x1D;
+    kc.has_symbol_key     = true;   // <-- the fix (stock config has this false)
+    instance.kb.setPins(KB_BACKLIGHT);
+    instance.kb.begin(kc, Wire, KB_INT);
+    // Pin the keyboard backlight at a fixed PWM level. Left unset it floats at a
+    // low duty that can visibly beat/pulse (especially as the display backlight
+    // steps down on dim); setting it explicitly holds it steady.
+    instance.kb.setBrightness(64);   // 0..255 PWM; steady mid-level
+
+#if CARDSAT_KB_KEYCODE_DEBUG
+    instance.kb.setRawCallback(kbRawProbe);   // prints every keycode; suppresses typing
+#endif
+}
+
 // ---------------------------------------------------------------------------
 static void bridgeLvgl()
 {
-    beginLvglHelper(instance);   // <-- reconcile this name with your LilyGoLib
+    beginLvglHelper(instance);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,15 +199,22 @@ void setup()
     // Brings up PMU, display + backlight, I2C keyboard, encoder, SD, and radio.
     instance.begin();
 
+    // Re-init the keyboard so the orange symbol key reaches digits/symbols
+    // (LilyGoLib's stock config disables it). Must come after instance.begin().
+    fixKeyboardSymbolKey();
+
     // Load persisted config (callsign, radio params, UI/power) from NVS.
     configLoad(cfg);
-    applyBrightness();
 
     // LVGL up first so the UI exists, then build screens.
-    lv_init();
+    // NOTE: beginLvglHelper() calls lv_init() internally — don't call it here.
     bridgeLvgl();
     uiInit(&cfg, &store);
     uiSetCallbacks(onSend, onSettingsApplied);
+
+    // Apply backlight AFTER LVGL + the first screen exist (matches the LilyGoLib
+    // examples, which draw then setBrightness). Pager scale is 0..16.
+    applyBrightness();
 
     // Configure the radio from cfg and start listening.
     if (!radioApply(cfg)) {
@@ -132,6 +226,11 @@ void setup()
     uiSetRadioStatus(s);
 
     lastInputMs = millis();
+
+    // Pump LVGL a few times so the first frame actually renders before we enter
+    // the main loop (where radio servicing and naps could otherwise delay it).
+    for (int i = 0; i < 5; i++) { lv_timer_handler(); delay(10); }
+
     Serial.println(F("CardSatPager ready."));
 }
 
@@ -148,31 +247,31 @@ static void powerTick()
 
     // Dim the backlight.
     if (!dimmed && cfg.dimTimeoutS && idleMs > (uint32_t)cfg.dimTimeoutS * 1000) {
-        instance.setBrightness(cfg.brightness / 6 + 2);   // low, not fully off
+        instance.setBrightness(2);   // dim but visible (0..16 scale)
         dimmed = true;
     }
 
-    // Optional deep sleep (wakes on keypress/encoder via the PMU/EXT wake the
-    // HAL configures). Only if the operator enabled a nonzero timeout.
+    // Optional deep sleep. Verified signature (LilyGo_LoRa_Pager.h):
+    //   void sleep(WakeupSource_t wakeup_src = WAKEUP_SRC_BOOT_BUTTON,
+    //              uint32_t sleep_second = 0);
+    // Wake on the boot button (and you can OR in the rotary centre button per the
+    // header docs). Execution resumes via reset on wake.
     if (cfg.sleepTimeoutS && idleMs > (uint32_t)cfg.sleepTimeoutS * 1000) {
         Serial.println(F("[power] entering deep sleep"));
-        instance.sleep();   // GLUE POINT 2b: LilyGoLib deep-sleep entry
-        // execution resumes via reset on wake
+        instance.sleep(WAKEUP_SRC_BOOT_BUTTON);
     }
 }
 
-// Light-sleep nap that preserves SX1262 RX. We arm a short timer wake AND the
-// radio's DIO1 as an EXT wake source, so either the timer or an inbound packet
-// brings us back promptly. Falls back to a plain delay if light sleep is off.
+// Idle yield. We deliberately do NOT use ESP32 light sleep here: entering and
+// exiting light sleep cycles the peripheral power domain that the keyboard
+// backlight LED sits on, so napping every loop made the keyboard backlight
+// visibly pulse. A 20 ms light-sleep nap saves little anyway — the dimmed
+// display backlight is the real power saving. So when idle we just delay, which
+// keeps the SX1262/LR1121 in continuous receive and the keyboard backlight
+// steady. (The cfg.lightSleep toggle is retained for the deep-sleep path.)
 static void idleNap()
 {
-    if (!cfg.lightSleep || dimmed == false) { delay(5); return; }
-
-    // Wake on DIO1 (RX done) or after a short interval to service LVGL ticks.
-    // The HAL knows the SX1262 DIO1 GPIO; if your LilyGoLib exposes a helper to
-    // register it as a wake source, prefer that. Timer wake keeps the UI live.
-    esp_sleep_enable_timer_wakeup(20 * 1000);   // 20 ms
-    esp_light_sleep_start();
+    delay(dimmed ? 15 : 5);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,11 +301,27 @@ void loop()
 
     // 4) Periodic status (battery, unread badge).
     static uint32_t lastStatus = 0;
-    if (millis() - lastStatus > 1000) {
+    if (millis() - lastStatus > 5000) {
         lastStatus = millis();
-        int pct = instance.getBatteryPercent();   // GLUE POINT 2a: PMU gauge
-        bool chg = instance.isCharging();
-        uiSetBattery(pct, chg);
+        // Battery via the BQ27220 fuel gauge (I2C 0x55). instance.begin() already
+        // calls gauge.begin()+setNewCapacity(), so we just refresh and read.
+        // getStateOfCharge() is a 0..100% value; a stale/error read can come back
+        // >100 (e.g. 0xFFFF), which we treat as "no reading" rather than a bogus
+        // 100%. Charging is detected from the signed current: >0 mA = charging.
+        if (instance.gauge.refresh()) {
+            uint16_t raw = instance.gauge.getStateOfCharge();
+            int16_t  cur = instance.gauge.getCurrent();   // mA, +charge / -discharge
+            bool charging = (cur > 0);
+            Serial.printf("[batt] SOC=%u%%  V=%umV  I=%dmA\n",
+                          raw, instance.gauge.getVoltage(), cur);
+            if (raw <= 100) {
+                uiSetBattery((int)raw, charging);
+            } else {
+                uiSetBattery(-1, false);   // out-of-range -> "--%"
+            }
+        } else {
+            uiSetBattery(-1, false);   // gauge read failed -> "--%"
+        }
         uiTick();
     }
 
